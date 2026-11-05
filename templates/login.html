@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VITAL GARANHAO — Entrar</title>
+<style>
+:root{--bg:#0b0e13;--panel:#121720;--line:#252e3b;--text:#eef3f8;--muted:#8c9aaa;--green:#39d98a;--red:#ff6878;--radius:16px}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;padding:20px;background:var(--bg);color:var(--text);font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Arial}
+button,input{font:inherit}button{cursor:pointer}
+.box{width:min(400px,100%)}
+.brand{display:flex;align-items:center;gap:11px;justify-content:center;margin-bottom:22px}
+.brand-mark{width:42px;height:42px;border-radius:13px;background:linear-gradient(135deg,#39d98a,#168b62);display:grid;place-items:center;color:#07130e;font-weight:900;font-size:22px}
+.brand strong{font-size:18px;letter-spacing:1.3px;display:block}
+.brand small{display:block;color:var(--muted);font-size:10px;letter-spacing:2px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:22px}
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:#0d131b;border:1px solid var(--line);border-radius:12px;padding:4px;margin-bottom:18px}
+.tabs button{background:transparent;border:0;color:#9ba9b9;padding:9px;border-radius:9px;font-weight:650}
+.tabs button.active{background:#1a2531;color:var(--text);box-shadow:inset 0 -2px var(--green)}
+form{display:none;gap:13px}
+form.active{display:grid}
+.field{display:grid;gap:6px}
+.field label{font-size:11px;color:#9eacbb;font-weight:650}
+.field input[type=text],.field input[type=password]{width:100%;background:#0d131b;border:1px solid #2a3543;color:var(--text);padding:11px 12px;border-radius:9px;outline:none}
+.field input:focus{border-color:var(--green)}
+.hint{color:var(--muted);font-size:11px}
+.show{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}
+.btn{border:1px solid var(--green);background:var(--green);color:#07140e;padding:11px 13px;border-radius:10px;font-weight:700;font-size:13px}
+.btn:disabled{opacity:.6;cursor:wait}
+.error{display:none;padding:10px 12px;border:1px solid #5a2832;background:#2a161b;color:#ffb3bd;border-radius:10px;font-size:12px;margin-bottom:14px}
+.error.show{display:block}
+footer{text-align:center;color:#586879;font-size:10px;margin-top:18px}
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="brand"><div class="brand-mark">F</div><div><strong>FINANCE PRO</strong><small>PERSONAL WEALTH</small></div></div>
+  <div class="card">
+    <div class="tabs" role="tablist">
+      <button type="button" id="tabLogin" class="active" role="tab" onclick="showTab('login')">Entrar</button>
+      <button type="button" id="tabRegister" role="tab" onclick="showTab('register')">Criar conta</button>
+    </div>
+    <div class="error" id="error" role="alert"></div>
+
+    <form id="loginForm" class="active" autocomplete="on">
+      <div class="field"><label for="loginUser">Usuário</label><input id="loginUser" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus></div>
+      <div class="field"><label for="loginPass">Senha</label><input id="loginPass" name="password" type="password" autocomplete="current-password" required></div>
+      <button class="btn" type="submit">Entrar</button>
+    </form>
+
+    <form id="registerForm" autocomplete="on">
+      <div class="field"><label for="regUser">Escolha um usuário</label><input id="regUser" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+        <span class="hint">3 a 30 caracteres: letras, números, ponto, hífen ou underline.</span></div>
+      <div class="field"><label for="regPass">Senha</label><input id="regPass" name="password" type="password" autocomplete="new-password" required>
+        <span class="hint">Mínimo de 8 caracteres.</span></div>
+      <div class="field"><label for="regPass2">Repita a senha</label><input id="regPass2" name="confirm" type="password" autocomplete="new-password" required></div>
+      <button class="btn" type="submit">Criar minha conta</button>
+    </form>
+
+    <label class="show" style="margin-top:14px"><input type="checkbox" id="showPass" onchange="togglePass()"> Mostrar senhas</label>
+  </div>
+  <footer>FINANCE PRO · Versão demonstrativa local · Não constitui recomendação de investimento.</footer>
+</div>
+
+{% raw %}
+<script>
+const errorBox=document.getElementById('error');
+function showError(msg){errorBox.textContent=msg;errorBox.classList.add('show')}
+function clearError(){errorBox.classList.remove('show');errorBox.textContent=''}
+function showTab(which){
+ clearError();
+ const login=which==='login';
+ document.getElementById('loginForm').classList.toggle('active',login);
+ document.getElementById('registerForm').classList.toggle('active',!login);
+ document.getElementById('tabLogin').classList.toggle('active',login);
+ document.getElementById('tabRegister').classList.toggle('active',!login);
+ document.getElementById(login?'loginUser':'regUser').focus();
+}
+function togglePass(){
+ const t=document.getElementById('showPass').checked?'text':'password';
+ ['loginPass','regPass','regPass2'].forEach(id=>document.getElementById(id).type=t);
+}
+async function post(url,body){
+ const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+ let j={};try{j=await r.json()}catch(e){}
+ if(!r.ok)throw new Error(j.error||'Erro inesperado. Tente de novo.');
+ return j;
+}
+async function submitForm(e,url){
+ e.preventDefault();clearError();
+ const form=e.target,btn=form.querySelector('button[type=submit]');
+ btn.disabled=true;
+ try{await post(url,Object.fromEntries(new FormData(form)));location.href='/'}
+ catch(err){showError(err.message);btn.disabled=false}
+}
+document.getElementById('loginForm').addEventListener('submit',e=>submitForm(e,'/api/login'));
+document.getElementById('registerForm').addEventListener('submit',e=>{
+ const f=e.target;
+ if(f.elements.password.value!==f.elements.confirm.value){e.preventDefault();clearError();showError('As senhas não conferem.');return}
+ submitForm(e,'/api/register');
+});
+</script>
+{% endraw %}
+</body>
+</html>
