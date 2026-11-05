@@ -25,6 +25,9 @@ Abra http://localhost:5000. Na primeira vez, clique em **Criar conta**.
 vital-garanhao/
 ├── app.py                # servidor Flask, login, API, cálculos e banco SQLite
 ├── requirements.txt
+├── DEPLOY.md             # passo a passo para publicar (GitHub + PythonAnywhere)
+├── setup_pythonanywhere.sh   # instala e configura o site no PythonAnywhere
+├── seed_demo.py          # cria uma conta de demonstração com dados de exemplo
 ├── templates/
 │   ├── index.html        # painel (exige login)
 │   └── login.html        # entrar / criar conta
