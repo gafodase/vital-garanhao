@@ -9,11 +9,19 @@ VENV_DIR="${VENV_DIR:-$HOME/venv-vital}"
 PY="${PYTHON:-python3.13}"
 command -v "$PY" >/dev/null 2>&1 || PY=python3
 USER_NAME="${USER:-$(whoami)}"
+# O endereço do site usa o usuário em minúsculas, mesmo que o usuário tenha letras maiúsculas.
+USER_LC="$(printf '%s' "$USER_NAME" | tr '[:upper:]' '[:lower:]')"
 
 # Arquivo de configuração do servidor (criado pela aba Web ao adicionar o site).
+# Procura pelo nome do usuário (como está e em minúsculas) e só aceita um arquivo que seja seu.
 WSGI_FILE="${WSGI_FILE:-}"
 if [ -z "$WSGI_FILE" ]; then
-  WSGI_FILE="$(ls /var/www/"${USER_NAME}"*_wsgi.py 2>/dev/null | head -n 1 || true)"
+  for candidate in /var/www/"${USER_NAME}"*_wsgi.py /var/www/"${USER_LC}"*_wsgi.py /var/www/*_wsgi.py; do
+    if [ -f "$candidate" ] && [ -O "$candidate" ] && [ -w "$candidate" ]; then
+      WSGI_FILE="$candidate"
+      break
+    fi
+  done
 fi
 
 echo "1/3  Criando o ambiente Python em $VENV_DIR ($("$PY" --version))"
@@ -52,5 +60,5 @@ Quase pronto. Faltam 3 passos na aba Web do PythonAnywhere:
   2. Ligue "Force HTTPS".
   3. Clique no botão verde "Reload".
 
-Depois abra:  https://${USER_NAME}.pythonanywhere.com
+Depois abra:  https://${USER_LC}.pythonanywhere.com
 EOF
