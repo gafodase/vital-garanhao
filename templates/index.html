@@ -121,13 +121,16 @@ footer{text-align:center;color:#586879;font-size:10px;margin-top:35px}
     <div class="field"><label>Nome do investimento</label><input name="name" required placeholder="Ex.: CDB Banco X"></div>
     <div class="field"><label>Tipo</label><select name="type"><option>CDB</option><option>LCI</option><option>LCA</option><option>Tesouro Selic</option><option>Tesouro IPCA+</option><option>Ações</option><option>FIIs</option><option>ETF</option><option>BDR</option><option>Poupança</option><option>Outro</option></select></div><div class="field full asset-search" id="assetField" hidden><label id="assetLabel">Ativo da B3</label><input id="assetSearch" type="search" autocomplete="off" placeholder="Toque para ver a lista ou digite o código/nome"><div id="assetResults" class="asset-results" hidden></div></div>
     
-    <div class="field"><label>Valor aplicado (R$)</label><input name="amount" type="number" min="0.01" step="0.01" required placeholder="100.00"></div>
+    <div class="field vi-only"><label>Quantidade comprada</label><input name="quantity" type="number" min="0.000001" step="any" required placeholder="Ex.: 10"></div>
+    <div class="field vi-only"><label>Preço pago por unidade (R$)</label><input name="unit_price" type="number" min="0.01" step="0.01" required placeholder="Ex.: 38.50"></div>
+    <div class="field full vi-only"><div class="hint" id="viTotal"></div></div>
+    <div class="field fi-only"><label>Valor aplicado (R$)</label><input name="amount" type="number" min="0.01" step="0.01" required placeholder="100.00"></div>
     <div class="field"><label>Data da aplicação</label><input name="date" type="date" required></div>
-    <div class="field"><label>Indexador</label><select name="index"><option value="CDI">% do CDI</option><option value="PREFIXADO">Prefixado (a.a.)</option><option value="IPCA">IPCA + taxa (a.a.)</option><option value="FIXO">Taxa fixa (a.a.)</option></select></div>
-    <div class="field"><label>Taxa (%)</label><input name="rate" type="number" min="0" step="0.01" value="100" required></div>
-    <div class="field"><label>Vencimento (opcional)</label><input name="maturity" type="date"></div>
+    <div class="field fi-only"><label>Indexador</label><select name="index"><option value="CDI">% do CDI</option><option value="PREFIXADO">Prefixado (a.a.)</option><option value="IPCA">IPCA + taxa (a.a.)</option><option value="FIXO">Taxa fixa (a.a.)</option></select></div>
+    <div class="field fi-only"><label>Taxa (%)</label><input name="rate" type="number" min="0" step="0.01" value="100" required></div>
+    <div class="field fi-only"><label>Vencimento (opcional)</label><input name="maturity" type="date"></div>
     <div class="field"><label>Instituição</label><input name="institution" placeholder="Banco ou corretora"></div>
-    <div class="field full"><div class="hint">Para CDI, informe o percentual do CDI (ex.: 100 = 100% do CDI). Para prefixado/fixo, informe a taxa anual. O IPCA é tratado como uma taxa adicional aproximada nesta versão.</div></div>
+    <div class="field full fi-only"><div class="hint">Para CDI, informe o percentual do CDI (ex.: 100 = 100% do CDI). Para prefixado/fixo, informe a taxa anual. O IPCA é tratado como uma taxa adicional aproximada nesta versão.</div></div>
     <div class="field full"><button class="btn primary" type="submit" id="investmentSubmit">Salvar investimento</button></div>
   </form>
 </div></div>
@@ -178,7 +181,7 @@ const money=n=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).
 const dateBR=s=>s?new Date(s+'T12:00:00').toLocaleDateString('pt-BR'):'—';
 const todayISO=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10)};
 function escapeHTML(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function fmtRate(inv){return inv.index==='CDI'?`${Number(inv.rate)}% do CDI`:inv.index==='IPCA'?`IPCA + ${Number(inv.rate)}% a.a.`:`${Number(inv.rate)}% a.a.`}
+function fmtRate(inv){if(inv.quantity!=null)return `${Number(inv.quantity).toLocaleString('pt-BR')} × ${money(inv.unit_price)}`;return inv.index==='CDI'?`${Number(inv.rate)}% do CDI`:inv.index==='IPCA'?`IPCA + ${Number(inv.rate)}% a.a.`:`${Number(inv.rate)}% a.a.`}
 
 function navigate(page){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('page-'+page).classList.add('active');document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===page));document.getElementById('pageTitle').textContent=({dashboard:'Visão geral',investments:'Investimentos',transactions:'Receitas e despesas',simulator:'Simulador',goals:'Metas financeiras'})[page];if(page==='dashboard')drawChart();if(innerWidth<=720)toggleMenu()}
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.page)));
@@ -202,9 +205,14 @@ function pickAsset(i){
  f.elements.type.value=a.type;
  document.getElementById('assetSearch').value=a.tk;hideAssets()
 }
+function updateViTotal(){const f=document.getElementById('investmentForm'),q=parseFloat(f.elements.quantity.value),p=parseFloat(f.elements.unit_price.value);document.getElementById('viTotal').textContent=q>0&&p>0?'Total investido: '+money(q*p):'Informe a quantidade e o preço para ver o total investido.'}
 const ASSET_TYPES={'Ações':'ações','FIIs':'FIIs','ETF':'ETFs','BDR':'BDRs'};
 function syncAssetField(){
  const t=document.getElementById('investmentForm').elements.type.value,on=t in ASSET_TYPES;
+ /* Renda variável: pede quantidade e preço pago; esconde taxa, indexador, valor e vencimento. */
+ document.querySelectorAll('#investmentForm .vi-only').forEach(el=>{el.hidden=!on;el.querySelectorAll('input').forEach(i=>i.disabled=!on)});
+ document.querySelectorAll('#investmentForm .fi-only').forEach(el=>{el.hidden=on;el.querySelectorAll('input,select').forEach(i=>i.disabled=on)});
+ updateViTotal();
  document.getElementById('assetField').hidden=!on;hideAssets();
  if(on)document.getElementById('assetLabel').textContent='Escolher '+ASSET_TYPES[t]+' da B3 (lista completa)'
 }
@@ -220,14 +228,14 @@ async function searchAssets(){
  box.innerHTML=hits.length?shown.map(([,i])=>`<button type="button" class="asset-item" data-i="${i}"><b>${escapeHTML(list[i].tk)}</b><span>${escapeHTML(list[i].nm)}</span></button>`).join('')+(hits.length>shown.length?`<div class="asset-empty">Mostrando ${shown.length} de ${hits.length}. Digite para filtrar.</div>`:`<div class="asset-empty">${hits.length} ${ASSET_TYPES[type]} encontrados.</div>`):'<div class="asset-empty">Nada encontrado. Você ainda pode digitar o nome à mão.</div>';
  box.hidden=false
 }
-document.getElementById('assetSearch').addEventListener('input',searchAssets);document.getElementById('assetSearch').addEventListener('focus',searchAssets);document.getElementById('assetSearch').addEventListener('click',searchAssets);document.getElementById('investmentForm').elements.type.addEventListener('change',syncAssetField);document.addEventListener('click',e=>{if(!e.target.closest('.asset-search'))hideAssets()});
+document.getElementById('investmentForm').addEventListener('input',updateViTotal);document.getElementById('assetSearch').addEventListener('input',searchAssets);document.getElementById('assetSearch').addEventListener('focus',searchAssets);document.getElementById('assetSearch').addEventListener('click',searchAssets);document.getElementById('investmentForm').elements.type.addEventListener('change',syncAssetField);document.addEventListener('click',e=>{if(!e.target.closest('.asset-search'))hideAssets()});
 document.getElementById('assetResults').addEventListener('click',e=>{const b=e.target.closest('.asset-item');if(b)pickAsset(+b.dataset.i)});
 document.getElementById('assetSearch').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();const b=assetBox().querySelector('.asset-item');if(b)pickAsset(+b.dataset.i)}else if(e.key==='Escape')hideAssets()});
 
 function openInvestmentModal(id){
  const f=document.getElementById('investmentForm');f.reset();syncAssetField();editing.investment=null;setModal('investment','Adicionar investimento','Salvar investimento');
  const i=id==null?null:S.investments.find(x=>x.id===id);
- if(i){editing.investment=i.id;setModal('investment','Editar investimento','Salvar alterações');fillForm(f,i,['name','type','amount','date','index','rate','maturity','institution'])}
+ if(i){editing.investment=i.id;setModal('investment','Editar investimento','Salvar alterações');fillForm(f,i,['name','type','amount','date','index','rate','maturity','institution','quantity','unit_price'])}
  else{f.elements.date.value=todayISO();f.elements.rate.value=100}
  syncAssetField();
  openModal('investmentModal')

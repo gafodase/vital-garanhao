@@ -83,7 +83,9 @@ CREATE TABLE IF NOT EXISTS investments (
     indexer TEXT NOT NULL,
     rate REAL NOT NULL,
     maturity TEXT NOT NULL DEFAULT '',
-    institution TEXT NOT NULL DEFAULT ''
+    institution TEXT NOT NULL DEFAULT '',
+    quantity REAL,
+    unit_price REAL
 );
 CREATE TABLE IF NOT EXISTS transactions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -133,6 +135,11 @@ def init_db():
     goal_cols = [r[1] for r in db.execute("PRAGMA table_info(goals)")]
     if "auto" not in goal_cols:
         db.execute("ALTER TABLE goals ADD COLUMN auto INTEGER NOT NULL DEFAULT 0")
+    # Renda variável guarda quantidade e preço pago; bancos antigos ganham as colunas (vazias).
+    inv_cols = [r[1] for r in db.execute("PRAGMA table_info(investments)")]
+    for col in ("quantity", "unit_price"):
+        if col not in inv_cols:
+            db.execute(f"ALTER TABLE investments ADD COLUMN {col} REAL")
     db.commit()
     db.close()
 
@@ -500,6 +507,7 @@ def api_summary():
             "id": row["id"], "name": row["name"], "type": row["type"],
             "amount": row["amount"], "date": row["date"], "index": row["indexer"],
             "rate": row["rate"], "maturity": row["maturity"], "institution": row["institution"],
+            "quantity": row["quantity"], "unit_price": row["unit_price"],
             "gross": round(m["gross"], 2), "profit": round(m["profit"], 2),
             "iof": round(m["iof"], 2), "ir": round(m["ir"], 2), "net": round(m["net"], 2),
             "days": m["days"], "annual_rate": round(m["annual_rate"], 6), "exempt": m["exempt"],
@@ -552,10 +560,22 @@ def as_bool(value):
 
 
 # Cada parse_* valida os dados vindos da tela e serve tanto para cadastrar (POST) quanto para editar (PUT).
+VARIABLE_TYPES = ("Ações", "FIIs", "ETF", "BDR")
+
+
 def parse_investment(d):
     inv_type = get_text(d, "type", "Tipo")
     if inv_type not in INVESTMENT_TYPES:
         raise ValidationError("Tipo: opção inválida.")
+    if inv_type in VARIABLE_TYPES:
+        # Renda variável: o valor aplicado é quantidade x preço pago. Sem preço ao vivo, o saldo não rende.
+        quantity = get_num(d, "quantity", "Quantidade", minimum=0, exclusive=True)
+        price = get_num(d, "unit_price", "Preço pago", minimum=0, exclusive=True)
+        return (
+            get_text(d, "name", "Nome"), inv_type, round(quantity * price, 2),
+            get_date(d, "date", "Data da compra"), "FIXO", 0.0, "",
+            get_text(d, "institution", "Instituição", required=False), quantity, price,
+        )
     indexer = get_text(d, "index", "Indexador")
     if indexer not in INDEXERS:
         raise ValidationError("Indexador: opção inválida.")
@@ -568,6 +588,7 @@ def parse_investment(d):
         get_num(d, "rate", "Taxa", minimum=0),
         get_date(d, "maturity", "Vencimento", required=False),
         get_text(d, "institution", "Instituição", required=False),
+        None, None,
     )
 
 
@@ -605,8 +626,8 @@ def add_investment():
     values = parse_investment(payload_dict())
     db = get_db()
     cur = db.execute(
-        "INSERT INTO investments(user_id, name, type, amount, date, indexer, rate, maturity, institution) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO investments(user_id, name, type, amount, date, indexer, rate, maturity, institution, "
+        "quantity, unit_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (g.user["id"], *values),
     )
     db.commit()
@@ -620,7 +641,7 @@ def edit_investment(row_id):
     db = get_db()
     cur = db.execute(
         "UPDATE investments SET name = ?, type = ?, amount = ?, date = ?, indexer = ?, rate = ?, "
-        "maturity = ?, institution = ? WHERE id = ? AND user_id = ?",
+        "maturity = ?, institution = ?, quantity = ?, unit_price = ? WHERE id = ? AND user_id = ?",
         (*values, row_id, g.user["id"]),
     )
     db.commit()

@@ -34,6 +34,8 @@ Abra http://localhost:5000. Na primeira vez, clique em **Criar conta**.
 Ao adicionar um investimento e escolher o tipo **Ações, FIIs, ETF ou BDR**, aparece o campo
 **Escolher ... da B3**: ao tocar nele a lista completa daquele tipo se abre (rolável) e dá para
 filtrar digitando código ou nome (ex.: PETR4, HGLG11, BOVA11, AAPL34). Escolher já preenche o nome.
+Para esses tipos o formulário pede **quantidade comprada** e **preço pago por unidade** (o valor investido é a multiplicação dos dois) e esconde taxa, indexador e vencimento.
+Como o site não consulta cotações, o saldo de renda variável fica no valor pago (não mostra lucro/prejuízo).
 A lista (cerca de 2.700 ativos) vem do Cadastro de Instrumentos da B3 de 05/11/2026 e fica em
 `b3_ativos.json`. É uma lista fixa: ativos novos ou que mudaram de código só entram quando o arquivo for atualizado.
 
