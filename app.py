@@ -12,6 +12,8 @@ import re
 import secrets
 import sqlite3
 import time
+import urllib.parse
+import urllib.request
 from datetime import date, timedelta
 from functools import wraps
 
@@ -205,6 +207,59 @@ def is_exempt(inv):
     return inv["type"] in TAX_EXEMPT_TYPES
 
 
+# ------------------------------------------------------------ cotações ----
+# Preço atual de ações, FIIs, ETFs e BDRs vem da brapi.dev (liberada na conta grátis do PythonAnywhere).
+# Para mais de 4 ativos a brapi pede um token gratuito: defina BRAPI_TOKEN no ambiente.
+QUOTE_TTL = 900         # reaproveita a cotação por 15 minutos
+QUOTE_FAIL_TTL = 300    # se a consulta falhar, não tenta de novo por 5 minutos
+QUOTE_TIMEOUT = 3       # segundos por consulta, para o site nunca travar
+_quotes = {}
+TICKER_RE = re.compile(r"^([A-Z0-9]{4}\d{1,2})\b")
+
+
+def ticker_of(name):
+    m = TICKER_RE.match(name or "")
+    return m.group(1) if m else None
+
+
+def fetch_quote(ticker):
+    """Consulta o preço atual. Devolve um número ou None."""
+    url = "https://brapi.dev/api/quote/" + urllib.parse.quote(ticker)
+    token = os.environ.get("BRAPI_TOKEN")
+    if token:
+        url += "?token=" + urllib.parse.quote(token)
+    req = urllib.request.Request(url, headers={"User-Agent": "vital-garanhao"})
+    with urllib.request.urlopen(req, timeout=QUOTE_TIMEOUT) as resp:
+        data = json.load(resp)
+    price = data["results"][0]["regularMarketPrice"]
+    price = float(price)
+    return price if price > 0 and not math.isnan(price) and not math.isinf(price) else None
+
+
+def get_quote(ticker):
+    now = time.time()
+    hit = _quotes.get(ticker)
+    if hit and now < hit[1]:
+        return hit[0]
+    try:
+        price = fetch_quote(ticker)
+    except Exception:  # sem internet, limite da brapi, ativo inexistente...: segue sem cotação
+        price = None
+    _quotes[ticker] = (price, now + (QUOTE_TTL if price else QUOTE_FAIL_TTL))
+    return price
+
+
+def quoted_metrics(inv, price, as_of):
+    """Renda variável com cotação: valor = quantidade x preço atual (lucro ou prejuízo, sem IR/IOF)."""
+    gross = float(inv["quantity"]) * price
+    profit = gross - float(inv["amount"])
+    return {
+        "gross": gross, "profit": profit, "iof": 0.0, "ir": 0.0, "net": gross,
+        "days": max(0, (as_of - date.fromisoformat(inv["date"])).days),
+        "annual_rate": 0.0, "exempt": False,
+    }
+
+
 def metrics(inv, cdi, as_of):
     gross = gross_value(inv, cdi, as_of)
     profit = max(0.0, gross - float(inv["amount"]))
@@ -226,7 +281,7 @@ def add_months(d, months):
     return first_next - timedelta(days=1)
 
 
-def evolution(rows, cdi, today, max_points=48):
+def evolution(rows, cdi, today, max_points=48, today_value=None):
     """Série para o gráfico: capital aplicado e valor bruto estimado, mês a mês até hoje."""
     rows = list(rows)
     if not rows:
@@ -246,7 +301,7 @@ def evolution(rows, cdi, today, max_points=48):
         for r in rows:
             if date.fromisoformat(r["date"]) <= p:
                 invested += float(r["amount"])
-                value += gross_value(r, cdi, p)
+                value += today_value[r["id"]] if today_value and p == today and r["id"] in today_value else gross_value(r, cdi, p)
         series.append({"date": p.isoformat(), "invested": round(invested, 2), "value": round(value, 2)})
     return series
 
@@ -495,11 +550,18 @@ def api_summary():
     cdi = float(g.user["cdi"])
     today = date.today()
 
-    investments, groups = [], {}
+    investments, groups, live = [], {}, {}
     invested = yielded = 0.0
     inv_rows = db.execute("SELECT * FROM investments WHERE user_id = ? ORDER BY id", (uid,)).fetchall()
     for row in inv_rows:
         m = metrics(row, cdi, today)
+        price = None
+        if row["type"] in VARIABLE_TYPES and row["quantity"]:
+            tk = ticker_of(row["name"])
+            price = get_quote(tk) if tk else None
+            if price:
+                m = quoted_metrics(row, price, today)
+                live[row["id"]] = m["gross"]
         invested += row["amount"]
         yielded += m["profit"]
         groups[row["type"]] = groups.get(row["type"], 0.0) + row["amount"]
@@ -507,7 +569,7 @@ def api_summary():
             "id": row["id"], "name": row["name"], "type": row["type"],
             "amount": row["amount"], "date": row["date"], "index": row["indexer"],
             "rate": row["rate"], "maturity": row["maturity"], "institution": row["institution"],
-            "quantity": row["quantity"], "unit_price": row["unit_price"],
+            "quantity": row["quantity"], "unit_price": row["unit_price"], "price": price,
             "gross": round(m["gross"], 2), "profit": round(m["profit"], 2),
             "iof": round(m["iof"], 2), "ir": round(m["ir"], 2), "net": round(m["net"], 2),
             "days": m["days"], "annual_rate": round(m["annual_rate"], 6), "exempt": m["exempt"],
@@ -549,7 +611,7 @@ def api_summary():
             "cash": round(cash, 2), "wealth": round(invested + yielded + cash, 2),
         },
         investments=investments, distribution=distribution,
-        evolution=evolution(inv_rows, cdi, today),
+        evolution=evolution(inv_rows, cdi, today, today_value=live),
         transactions=transactions, income=round(income, 2), expense=round(expense, 2),
         goals=goals,
     )

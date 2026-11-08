@@ -69,3 +69,11 @@ O `vital.db` (usuários e dados) fica só no servidor e não é afetado pelo `gi
 - O script não achou o arquivo WSGI: ele imprime o texto na tela. Na aba Web, abra o link do
   arquivo WSGI, apague tudo e cole esse texto.
 - A versão do Python do **Virtualenv** deve ser a mesma escolhida no passo 2.
+
+## Cotações ao vivo (opcional)
+
+Sem configurar nada, a brapi.dev cota só alguns ativos (PETR4, VALE3, ITUB4, MGLU3). Para cotar todos:
+
+1. Crie uma conta grátis em https://brapi.dev e copie o seu token.
+2. Aba **Web** → seção **Code** → abra o arquivo WSGI e acrescente, antes da última linha, `os.environ['BRAPI_TOKEN'] = 'SEU_TOKEN'`.
+3. Clique em **Reload**.

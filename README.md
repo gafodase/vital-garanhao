@@ -35,7 +35,9 @@ Ao adicionar um investimento e escolher o tipo **Ações, FIIs, ETF ou BDR**, ap
 **Escolher ... da B3**: ao tocar nele a lista completa daquele tipo se abre (rolável) e dá para
 filtrar digitando código ou nome (ex.: PETR4, HGLG11, BOVA11, AAPL34). Escolher já preenche o nome.
 Para esses tipos o formulário pede **quantidade comprada** e **preço pago por unidade** (o valor investido é a multiplicação dos dois) e esconde taxa, indexador e vencimento.
-Como o site não consulta cotações, o saldo de renda variável fica no valor pago (não mostra lucro/prejuízo).
+Com o ativo escolhido na lista, o site busca a **cotação atual na brapi.dev** (guarda por 15 minutos) e mostra o valor de hoje e o lucro ou prejuízo.
+Se a cotação não vier (sem internet, limite do serviço, nome digitado à mão), o ativo fica pelo valor pago. Sem IR/IOF nessa conta.
+A brapi libera poucos ativos sem cadastro; para a carteira toda, crie um token grátis em https://brapi.dev e defina `BRAPI_TOKEN`.
 A lista (cerca de 2.700 ativos) vem do Cadastro de Instrumentos da B3 de 05/11/2026 e fica em
 `b3_ativos.json`. É uma lista fixa: ativos novos ou que mudaram de código só entram quando o arquivo for atualizado.
 
