@@ -5,6 +5,7 @@ Rodar:
     python app.py
 Abrir: http://localhost:5000
 """
+import json
 import math
 import os
 import re
@@ -459,6 +460,24 @@ def api_login():
 def api_logout():
     session.clear()
     return jsonify(ok=True)
+
+
+def load_b3_assets():
+    """Lista fixa de ações, FIIs e ETFs da B3 (arquivo b3_ativos.json): [codigo, nome, tipo]."""
+    try:
+        with open(os.path.join(BASE_DIR, "b3_ativos.json"), encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return []
+
+
+B3_ASSETS = load_b3_assets()
+
+
+@app.get("/api/assets")
+@login_required
+def api_assets():
+    return jsonify(B3_ASSETS)
 
 
 @app.get("/api/summary")
