@@ -11,6 +11,19 @@ Cada pessoa vê apenas os próprios investimentos, movimentações e metas.
 Abra o link, clique em **Criar conta** e use. Não precisa instalar nada.
 Use sempre `https://`. Não coloque dados financeiros reais: é uma versão de demonstração.
 
+## Versões
+
+| Versão | O que mudou |
+|--------|-------------|
+| **v1.5** | Cotações ao vivo (brapi.dev) com lucro e prejuízo em ações, FIIs, ETFs e BDRs |
+| **v1.4** | Renda variável pede quantidade e preço pago; some taxa, indexador e vencimento |
+| **v1.3** | Lista da B3 (ações, FIIs, ETFs e BDRs) para escolher o ativo |
+| **v1.2** | Link do site no README |
+| **v1.1** | Publicação online (PythonAnywhere) e conta de demonstração |
+| **v1.0** | Primeira versão: Flask + SQLite, login, metas automáticas, edição, impostos e gráfico |
+
+Detalhes de cada versão no [CHANGELOG](CHANGELOG.md).
+
 ## Como rodar no seu computador (opcional)
 
 Só precisa disto se quiser mexer no código. Para apenas usar o site, use o link acima.
