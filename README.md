@@ -4,7 +4,17 @@ Controle financeiro com **Flask (Python) + SQLite**, com **login e cadastro de u
 O Python guarda os dados e faz os cálculos (rendimento, IR, IOF, simulador); o HTML cuida só da tela.
 Cada pessoa vê apenas os próprios investimentos, movimentações e metas.
 
-## Como rodar
+## Acessar o site
+
+**https://ganaves.pythonanywhere.com**
+
+Abra o link, clique em **Criar conta** e use. Não precisa instalar nada.
+Use sempre `https://`. Não coloque dados financeiros reais: é uma versão de demonstração.
+
+## Como rodar no seu computador (opcional)
+
+Só precisa disto se quiser mexer no código. Para apenas usar o site, use o link acima.
+Antes, instale o Python (https://www.python.org) e abra o terminal dentro da pasta do projeto.
 
 ```bash
 python -m venv .venv
