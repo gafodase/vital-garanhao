@@ -29,12 +29,13 @@ Abra http://localhost:5000. Na primeira vez, clique em **Criar conta**.
 
 > Dados de uma versão antiga (sem login) ficam para a **primeira conta criada**.
 
-## Busca de ações, FIIs e ETFs
+## Lista de ações, FIIs, ETFs e BDRs
 
-Ao adicionar um investimento, o campo **Buscar ação, FII ou ETF da B3** procura por código ou nome
-(ex.: PETR4, HGLG11, BOVA11) e já preenche o nome e o tipo. A lista (cerca de 1.600 ativos) vem do
-Cadastro de Instrumentos da B3 e fica no arquivo `b3_ativos.json`. É uma lista fixa: ativos novos
-ou que mudaram de código só entram quando o arquivo for atualizado. BDRs e ativos de renda fixa não estão incluídos.
+Ao adicionar um investimento e escolher o tipo **Ações, FIIs, ETF ou BDR**, aparece o campo
+**Escolher ... da B3**: ao tocar nele a lista completa daquele tipo se abre (rolável) e dá para
+filtrar digitando código ou nome (ex.: PETR4, HGLG11, BOVA11, AAPL34). Escolher já preenche o nome.
+A lista (cerca de 2.700 ativos) vem do Cadastro de Instrumentos da B3 de 05/11/2026 e fica em
+`b3_ativos.json`. É uma lista fixa: ativos novos ou que mudaram de código só entram quando o arquivo for atualizado.
 
 ## Estrutura
 
@@ -44,7 +45,7 @@ vital-garanhao/
 ├── requirements.txt
 ├── DEPLOY.md             # passo a passo para publicar (GitHub + PythonAnywhere)
 ├── setup_pythonanywhere.sh   # instala e configura o site no PythonAnywhere
-├── b3_ativos.json        # lista fixa de ações, FIIs e ETFs da B3 (posição de 05/11/2026)
+├── b3_ativos.json        # lista fixa de ações, FIIs, ETFs e BDRs da B3 (posição de 05/11/2026)
 ├── seed_demo.py          # cria uma conta de demonstração com dados de exemplo
 ├── templates/
 │   ├── index.html        # painel (exige login)
@@ -73,7 +74,7 @@ Não compartilhe `vital.db` nem `secret.key`.
 | PUT | `/api/goals/<id>` | Edita meta |
 | PATCH | `/api/goals/<id>` | Liga/desliga o acompanhamento automático da meta |
 | DELETE | `/api/goals/<id>` | Exclui meta |
-| GET | `/api/assets` | Lista de ações, FIIs e ETFs da B3 (para a busca no cadastro) |
+| GET | `/api/assets` | Lista de ações, FIIs, ETFs e BDRs da B3 (para o cadastro) |
 | PUT | `/api/settings` | Altera o CDI de referência |
 | POST | `/api/simulate` | Simulador de juros compostos |
 

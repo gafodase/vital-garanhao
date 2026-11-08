@@ -24,7 +24,7 @@ DB_PATH = os.environ.get("VITAL_DB", os.path.join(BASE_DIR, "vital.db"))
 DEFAULT_CDI = 14.0
 INVESTMENT_TYPES = [
     "CDB", "LCI", "LCA", "Tesouro Selic", "Tesouro IPCA+",
-    "Ações", "FIIs", "ETF", "Poupança", "Outro",
+    "Ações", "FIIs", "ETF", "BDR", "Poupança", "Outro",
 ]
 INDEXERS = ["CDI", "PREFIXADO", "IPCA", "FIXO"]
 OWNED_TABLES = ("investments", "transactions", "goals")
