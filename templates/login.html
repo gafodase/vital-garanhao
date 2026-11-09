@@ -25,6 +25,11 @@ form.active{display:grid}
 .field input[type=text],.field input[type=password]{width:100%;background:#0d131b;border:1px solid #2a3543;color:var(--text);padding:11px 12px;border-radius:9px;outline:none}
 .field input:focus{border-color:var(--green)}
 .hint{color:var(--muted);font-size:11px}
+.link{background:none;border:0;color:var(--green);padding:0;font-size:12px;text-align:left;text-decoration:underline}
+.code{font:700 22px/1.3 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:2px;text-align:center;background:#0d131b;border:1px dashed var(--green);border-radius:12px;padding:16px 10px;margin:14px 0;user-select:all}
+.warn{padding:10px 12px;border:1px solid #6b5a22;background:#2a2412;color:#f5dc8a;border-radius:10px;font-size:12px}
+.btn.ghost{background:transparent;color:var(--text);border-color:#2a3543}
+#codeBox{display:none}#codeBox.active{display:block}
 .show{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}
 .btn{border:1px solid var(--green);background:var(--green);color:#07140e;padding:11px 13px;border-radius:10px;font-weight:700;font-size:13px}
 .btn:disabled{opacity:.6;cursor:wait}
@@ -47,6 +52,17 @@ footer{text-align:center;color:#586879;font-size:10px;margin-top:18px}
       <div class="field"><label for="loginUser">Usuário</label><input id="loginUser" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus></div>
       <div class="field"><label for="loginPass">Senha</label><input id="loginPass" name="password" type="password" autocomplete="current-password" required></div>
       <button class="btn" type="submit">Entrar</button>
+      <button type="button" class="link" onclick="showTab('recover')">Esqueci minha senha</button>
+    </form>
+
+    <form id="recoverForm" autocomplete="off">
+      <div class="hint">Use o código de recuperação que apareceu quando você criou a conta (formato XXXX-XXXX-XXXX-XXXX).</div>
+      <div class="field"><label for="recUser">Usuário</label><input id="recUser" name="username" type="text" autocapitalize="none" spellcheck="false" required></div>
+      <div class="field"><label for="recCode">Código de recuperação</label><input id="recCode" name="code" type="text" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX" required></div>
+      <div class="field"><label for="recPass">Nova senha</label><input id="recPass" name="password" type="password" autocomplete="new-password" required><span class="hint">Mínimo de 8 caracteres.</span></div>
+      <div class="field"><label for="recPass2">Repita a nova senha</label><input id="recPass2" name="confirm" type="password" autocomplete="new-password" required></div>
+      <button class="btn" type="submit">Definir nova senha</button>
+      <button type="button" class="link" onclick="showTab('login')">Voltar para entrar</button>
     </form>
 
     <form id="registerForm" autocomplete="on">
@@ -58,7 +74,14 @@ footer{text-align:center;color:#586879;font-size:10px;margin-top:18px}
       <button class="btn" type="submit">Criar minha conta</button>
     </form>
 
-    <label class="show" style="margin-top:14px"><input type="checkbox" id="showPass" onchange="togglePass()"> Mostrar senhas</label>
+    <div id="codeBox">
+      <h3 style="margin:0 0 6px">Guarde seu código de recuperação</h3>
+      <div class="warn">Ele é a única forma de recuperar a conta se você esquecer a senha. Aparece só agora: anote ou tire um print.</div>
+      <div class="code" id="codeText"></div>
+      <div style="display:grid;gap:8px"><button class="btn ghost" type="button" onclick="copyCode()" id="copyBtn">Copiar código</button><button class="btn" type="button" onclick="location.href='/'">Já guardei, continuar</button></div>
+    </div>
+
+    <label class="show" style="margin-top:14px" id="showRow"><input type="checkbox" id="showPass" onchange="togglePass()"> Mostrar senhas</label>
   </div>
   <footer>FINANCE PRO · Versão demonstrativa local · Não constitui recomendação de investimento.</footer>
 </div>
@@ -71,15 +94,17 @@ function clearError(){errorBox.classList.remove('show');errorBox.textContent=''}
 function showTab(which){
  clearError();
  const login=which==='login';
+ const rec=which==='recover';
  document.getElementById('loginForm').classList.toggle('active',login);
- document.getElementById('registerForm').classList.toggle('active',!login);
- document.getElementById('tabLogin').classList.toggle('active',login);
- document.getElementById('tabRegister').classList.toggle('active',!login);
- document.getElementById(login?'loginUser':'regUser').focus();
+ document.getElementById('registerForm').classList.toggle('active',which==='register');
+ document.getElementById('recoverForm').classList.toggle('active',rec);
+ document.getElementById('tabLogin').classList.toggle('active',login||rec);
+ document.getElementById('tabRegister').classList.toggle('active',which==='register');
+ document.getElementById({login:'loginUser',register:'regUser',recover:'recUser'}[which]).focus();
 }
 function togglePass(){
  const t=document.getElementById('showPass').checked?'text':'password';
- ['loginPass','regPass','regPass2'].forEach(id=>document.getElementById(id).type=t);
+ ['loginPass','regPass','regPass2','recPass','recPass2'].forEach(id=>document.getElementById(id).type=t);
 }
 async function post(url,body){
  const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -91,9 +116,22 @@ async function submitForm(e,url){
  e.preventDefault();clearError();
  const form=e.target,btn=form.querySelector('button[type=submit]');
  btn.disabled=true;
- try{await post(url,Object.fromEntries(new FormData(form)));location.href='/'}
+ try{const j=await post(url,Object.fromEntries(new FormData(form)));if(j.recovery_code)showCode(j.recovery_code);else location.href='/'}
  catch(err){showError(err.message);btn.disabled=false}
 }
+function showCode(code){
+ document.querySelectorAll('form,.tabs,#showRow,#error').forEach(el=>el.style.display='none');
+ document.getElementById('codeText').textContent=code;document.getElementById('codeBox').classList.add('active');
+}
+async function copyCode(){
+ const t=document.getElementById('codeText').textContent,b=document.getElementById('copyBtn');
+ try{await navigator.clipboard.writeText(t);b.textContent='Copiado!'}catch(e){b.textContent='Selecione o código acima e copie'}
+}
+document.getElementById('recoverForm').addEventListener('submit',e=>{
+ const f=e.target;
+ if(f.elements.password.value!==f.elements.confirm.value){e.preventDefault();clearError();showError('As senhas não conferem.');return}
+ submitForm(e,'/api/recover');
+});
 document.getElementById('loginForm').addEventListener('submit',e=>submitForm(e,'/api/login'));
 document.getElementById('registerForm').addEventListener('submit',e=>{
  const f=e.target;

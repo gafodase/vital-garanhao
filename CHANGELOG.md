@@ -2,6 +2,12 @@
 
 Tudo o que mudou no projeto, da primeira versão até agora. A mais recente vem primeiro.
 
+## v1.7: Gráfico, meta de renda e recuperação de senha (09/11/2026)
+- Aba Proventos: **gráfico de barras** com o que você recebeu nos últimos 12 meses.
+- **Meta de renda passiva por mês**: linha tracejada no gráfico e barra de progresso.
+- **Recuperação de senha** sem e-mail: código mostrado uma vez ao criar a conta, tela "Esqueci minha senha" e botão para gerar um novo código.
+- Tentativas erradas de recuperação também são limitadas (5 em 5 minutos).
+
 ## v1.6: Proventos (09/11/2026)
 - Nova aba **Proventos**: média por mês, total já recebido e valor a receber de cada ação, FII, ETF e BDR.
 - Tabela mês a mês com tudo o que já caiu, contando só o que foi pago depois da sua compra.
@@ -42,5 +48,3 @@ Tudo o que mudou no projeto, da primeira versão até agora. A mais recente vem 
 - Regras de imposto: IR regressivo e IOF; LCI, LCA e Poupança isentos.
 - Gráfico de evolução do patrimônio.
 
-## Ainda não feito
-- Recuperação de senha.

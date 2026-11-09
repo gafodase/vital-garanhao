@@ -74,7 +74,9 @@ CREATE TABLE IF NOT EXISTS users (
     username TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     cdi REAL NOT NULL DEFAULT 14,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    recovery_hash TEXT,
+    income_goal REAL NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS investments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -138,6 +140,11 @@ def init_db():
     goal_cols = [r[1] for r in db.execute("PRAGMA table_info(goals)")]
     if "auto" not in goal_cols:
         db.execute("ALTER TABLE goals ADD COLUMN auto INTEGER NOT NULL DEFAULT 0")
+    user_cols = [r[1] for r in db.execute("PRAGMA table_info(users)")]
+    if "recovery_hash" not in user_cols:
+        db.execute("ALTER TABLE users ADD COLUMN recovery_hash TEXT")
+    if "income_goal" not in user_cols:
+        db.execute("ALTER TABLE users ADD COLUMN income_goal REAL NOT NULL DEFAULT 0")
     # Renda variável guarda quantidade e preço pago; bancos antigos ganham as colunas (vazias).
     inv_cols = [r[1] for r in db.execute("PRAGMA table_info(investments)")]
     for col in ("quantity", "unit_price"):
@@ -457,6 +464,26 @@ def record_failure(key):
 DUMMY_HASH = generate_password_hash("senha-falsa-para-igualar-o-tempo")
 
 
+RECOVERY_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # sem I, O, 0 e 1, que se confundem
+
+
+def new_recovery_code():
+    raw = "".join(secrets.choice(RECOVERY_ALPHABET) for _ in range(16))
+    return "-".join(raw[i:i + 4] for i in range(0, 16, 4))
+
+
+def normalize_recovery_code(value):
+    return "".join(ch for ch in str(value or "").upper() if ch.isalnum())
+
+
+def issue_recovery_code(db, user_id):
+    """Gera um código novo (o anterior deixa de valer). Só o hash fica guardado."""
+    code = new_recovery_code()
+    db.execute("UPDATE users SET recovery_hash = ? WHERE id = ?",
+               (generate_password_hash(normalize_recovery_code(code)), user_id))
+    return code
+
+
 def start_session(user_id):
     session.clear()
     session["user_id"] = user_id
@@ -468,7 +495,7 @@ def current_user():
     if uid is None:
         return None
     return get_db().execute(
-        "SELECT id, username, cdi FROM users WHERE id = ?", (uid,)
+        "SELECT id, username, cdi, income_goal FROM users WHERE id = ?", (uid,)
     ).fetchone()
 
 
@@ -546,9 +573,10 @@ def api_register():
     user_id = cur.lastrowid
     if db.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 1:
         adopt_legacy_data(db, user_id)
+    code = issue_recovery_code(db, user_id)
     db.commit()
     start_session(user_id)
-    return jsonify(username=username), 201
+    return jsonify(username=username, recovery_code=code), 201
 
 
 @app.post("/api/login")
@@ -574,6 +602,68 @@ def api_login():
     _failed_logins.pop(key, None)
     start_session(user["id"])
     return jsonify(username=user["username"])
+
+
+@app.post("/api/recover")
+def api_recover():
+    """Redefine a senha com o código de recuperação guardado no cadastro."""
+    d = payload_dict()
+    username = str(d.get("username") or "").strip().lower()
+    code = normalize_recovery_code(d.get("code"))[:32]
+    password = str(d.get("password") or "")
+    confirm = d.get("confirm")
+    key = f"recover|{request.remote_addr}|{username}"
+    if is_throttled(key):
+        return jsonify(error="Muitas tentativas erradas. Aguarde alguns minutos e tente de novo."), 429
+    if confirm is not None and str(confirm) != password:
+        raise ValidationError("As senhas não conferem.")
+    validate_password(password)
+
+    db = get_db()
+    user = db.execute("SELECT id, username, recovery_hash FROM users WHERE username = ?", (username,)).fetchone()
+    ok = check_password_hash(user["recovery_hash"] if user and user["recovery_hash"] else DUMMY_HASH, code)
+    if user is None or not user["recovery_hash"] or not ok:
+        record_failure(key)
+        return jsonify(error="Usuário ou código de recuperação incorretos."), 401
+
+    _failed_logins.pop(key, None)
+    db.execute("UPDATE users SET password_hash = ? WHERE id = ?", (generate_password_hash(password), user["id"]))
+    new_code = issue_recovery_code(db, user["id"])  # o código usado deixa de valer
+    db.commit()
+    start_session(user["id"])
+    return jsonify(username=user["username"], recovery_code=new_code)
+
+
+@app.post("/api/recovery-code")
+@login_required
+def api_new_recovery_code():
+    """Gera um código de recuperação novo (para contas antigas ou se o código foi perdido). Pede a senha."""
+    d = payload_dict()
+    key = f"rcode|{request.remote_addr}|{g.user['username']}"
+    if is_throttled(key):
+        return jsonify(error="Muitas tentativas erradas. Aguarde alguns minutos e tente de novo."), 429
+    row = get_db().execute("SELECT password_hash FROM users WHERE id = ?", (g.user["id"],)).fetchone()
+    if not check_password_hash(row["password_hash"], str(d.get("password") or "")[:MAX_PASSWORD]):
+        record_failure(key)
+        return jsonify(error="Senha incorreta."), 401
+    _failed_logins.pop(key, None)
+    db = get_db()
+    code = issue_recovery_code(db, g.user["id"])
+    db.commit()
+    return jsonify(recovery_code=code)
+
+
+@app.put("/api/income-goal")
+@login_required
+def update_income_goal():
+    d = payload_dict()
+    value = get_num(d, "value", "Meta de renda mensal", minimum=0)
+    if value > 10_000_000:
+        raise ValidationError("Meta de renda mensal: valor muito alto.")
+    db = get_db()
+    db.execute("UPDATE users SET income_goal = ? WHERE id = ?", (value, g.user["id"]))
+    db.commit()
+    return jsonify(income_goal=value)
 
 
 @app.post("/api/logout")
@@ -679,7 +769,7 @@ def api_summary():
         })
 
     return jsonify(
-        username=g.user["username"],
+        username=g.user["username"], income_goal=float(g.user["income_goal"] or 0),
         cdi=cdi,
         totals={
             "invested": round(invested, 2), "yield": round(yielded, 2),

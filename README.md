@@ -14,7 +14,9 @@ Não coloque dados financeiros reais: é uma versão de demonstração.
 - **Painel** com patrimônio total, rendimento estimado, gráfico de evolução mês a mês e distribuição da carteira.
 - **Renda fixa** (CDB, LCI, LCA, Tesouro, Poupança): rendimento por CDI, IPCA+ ou taxa fixa, com **IR e IOF** calculados.
 - **Renda variável** (ações, FIIs, ETFs e BDRs): lista completa da B3 para escolher o ativo, com quantidade, preço pago e **cotação atual, lucro e prejuízo**.
-- **Proventos** (dividendos, JCP e rendimentos): média mensal e total recebido de cada ativo, mês a mês, e o que ainda vai cair.
+- **Proventos** (dividendos, JCP e rendimentos): média mensal e total recebido de cada ativo, gráfico dos últimos 12 meses e o que ainda vai cair.
+- **Meta de renda passiva:** defina quanto quer receber por mês e acompanhe o progresso.
+- **Recuperação de senha** por código (veja Segurança).
 - **Receitas e despesas** por categoria, com o saldo do mês.
 - **Metas financeiras** que acompanham o total da carteira sozinhas, se você quiser.
 - **Simulador** de juros compostos.
@@ -27,6 +29,7 @@ Não coloque dados financeiros reais: é uma versão de demonstração.
 
 | Versão | O que mudou |
 |--------|-------------|
+| **v1.7** | Gráfico de proventos por mês, meta de renda passiva e recuperação de senha |
 | **v1.6** | Aba **Proventos**: quanto cada ativo paga por mês e quanto você já recebeu |
 | **v1.5** | Cotações ao vivo (brapi.dev) com lucro e prejuízo em ações, FIIs, ETFs e BDRs |
 | **v1.4** | Renda variável pede quantidade e preço pago; some taxa, indexador e vencimento |
@@ -35,7 +38,7 @@ Não coloque dados financeiros reais: é uma versão de demonstração.
 | **v1.1** | Publicação online (PythonAnywhere) e conta de demonstração |
 | **v1.0** | Primeira versão: Flask + SQLite, login, metas automáticas, edição, impostos e gráfico |
 
-Detalhes de cada versão no [CHANGELOG](CHANGELOG.md). Ainda não feito: recuperação de senha.
+Detalhes de cada versão no [CHANGELOG](CHANGELOG.md).
 
 ## Tecnologias
 
@@ -80,7 +83,8 @@ Em outros servidores é preciso: HTTPS com `HTTPS=1`, um servidor de produção 
 
 - Senhas guardadas com hash (nunca o texto da senha).
 - Cookie de sessão protegido (HttpOnly, SameSite) e válido por 7 dias.
-- Bloqueio temporário após 5 senhas erradas em 5 minutos.
+- Bloqueio temporário após 5 senhas erradas em 5 minutos (vale também para a recuperação).
+- **Recuperação de senha:** ao criar a conta aparece um código (XXXX-XXXX-XXXX-XXXX), mostrado uma única vez; só o hash dele fica guardado. Em "Esqueci minha senha", usuário + código definem uma senha nova e o código usado deixa de valer. Contas antigas ou código perdido: botão **Recuperação** no topo gera um novo, pedindo a senha. Não usa e-mail.
 - Cada consulta é filtrada pelo usuário logado, então ninguém acessa dados de outra conta.
 - `vital.db` e `secret.key` ficam só no servidor e nunca vão para o GitHub.
 
@@ -123,6 +127,9 @@ vital-garanhao/
 | PUT | `/api/goals/<id>` | Edita meta |
 | PATCH | `/api/goals/<id>` | Liga/desliga o acompanhamento automático da meta |
 | DELETE | `/api/goals/<id>` | Exclui meta |
+| POST | `/api/recover` | Define nova senha com o código de recuperação |
+| POST | `/api/recovery-code` | Gera um novo código de recuperação (logado, pede a senha) |
+| PUT | `/api/income-goal` | Define a meta de renda passiva mensal |
 | PUT | `/api/settings` | Altera o CDI de referência |
 | POST | `/api/simulate` | Simulador de juros compostos |
 
