@@ -42,6 +42,7 @@ footer{text-align:center;color:#586879;font-size:10px;margin-top:35px}
     <button class="active" data-page="dashboard"><span class="ico">▦</span>Visão geral</button>
     <button data-page="investments"><span class="ico">↗</span>Investimentos</button>
     <button data-page="transactions"><span class="ico">⇄</span>Receitas e despesas</button>
+    <button data-page="dividends"><span class="ico">$</span>Proventos</button>
     <button data-page="simulator"><span class="ico">⌗</span>Simulador</button>
     <button data-page="goals"><span class="ico">◎</span>Metas financeiras</button>
   </nav></div>
@@ -88,6 +89,20 @@ footer{text-align:center;color:#586879;font-size:10px;margin-top:35px}
     <div class="card"><div class="stat-top">Lançamentos</div><div class="stat-value" id="transactionCount">0</div></div>
   </div>
   <div class="card table-card"><div class="table-wrap"><table><thead><tr><th>Descrição</th><th>Categoria</th><th>Data</th><th>Tipo</th><th>Valor</th><th>Ações</th></tr></thead><tbody id="transactionRows"></tbody></table></div></div>
+</section>
+
+<section class="page" id="page-dividends">
+  <div class="section-head"><div><h2>Proventos</h2><p>Dividendos, JCP e rendimentos de ações, FIIs, ETFs e BDRs: quanto cada ativo paga por mês e quanto você já recebeu.</p></div></div>
+  <div class="grid stats" style="margin-bottom:14px">
+    <div class="card"><div class="stat-top">Já recebido</div><div class="stat-value positive" id="divReceived">R$ 0,00</div></div>
+    <div class="card"><div class="stat-top">Média por mês</div><div class="stat-value" id="divAvg">R$ 0,00</div><div class="stat-foot">Últimos 12 meses</div></div>
+    <div class="card"><div class="stat-top">A receber</div><div class="stat-value" id="divUpcoming">R$ 0,00</div><div class="stat-foot">Já anunciado</div></div>
+  </div>
+  <div class="section-head"><div><h2>Por ativo</h2></div></div>
+  <div class="card table-card"><div class="table-wrap"><table><thead><tr><th>Ativo</th><th>Quantidade</th><th>Média por mês</th><th>Já recebido</th><th>Próximo pagamento</th></tr></thead><tbody id="divAssetRows"></tbody></table></div></div>
+  <div class="section-head"><div><h2>Mês a mês</h2></div></div>
+  <div class="card table-card"><div class="table-wrap"><table><thead><tr><th>Mês</th><th>Recebido</th></tr></thead><tbody id="divMonthRows"></tbody></table></div></div>
+  <div class="notice" style="margin-top:14px">Valores estimados a partir dos dados da brapi.dev, contando só o que foi pago a quem já tinha o ativo na data com. Podem divergir do que a corretora creditou (impostos, ajustes). Sem cotação, o ativo não aparece aqui.</div>
 </section>
 
 <section class="page" id="page-simulator">
@@ -183,7 +198,7 @@ const todayISO=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezone
 function escapeHTML(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function fmtRate(inv){if(inv.quantity!=null)return `${Number(inv.quantity).toLocaleString('pt-BR')} × ${money(inv.unit_price)}`+(inv.price?` → ${money(inv.price)} hoje`:'');return inv.index==='CDI'?`${Number(inv.rate)}% do CDI`:inv.index==='IPCA'?`IPCA + ${Number(inv.rate)}% a.a.`:`${Number(inv.rate)}% a.a.`}
 
-function navigate(page){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('page-'+page).classList.add('active');document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===page));document.getElementById('pageTitle').textContent=({dashboard:'Visão geral',investments:'Investimentos',transactions:'Receitas e despesas',simulator:'Simulador',goals:'Metas financeiras'})[page];if(page==='dashboard')drawChart();if(innerWidth<=720)toggleMenu()}
+function navigate(page){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('page-'+page).classList.add('active');document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===page));document.getElementById('pageTitle').textContent=({dashboard:'Visão geral',investments:'Investimentos',transactions:'Receitas e despesas',dividends:'Proventos',simulator:'Simulador',goals:'Metas financeiras'})[page];if(page==='dashboard')drawChart();if(innerWidth<=720)toggleMenu()}
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>navigate(b.dataset.page)));
 function toggleMenu(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('sidebarBackdrop').classList.toggle('open')}
 function openModal(id){document.getElementById(id).classList.add('open')}
@@ -266,7 +281,7 @@ async function saveCdi(){try{await api('/api/settings','PUT',{cdi:document.getEl
 
 function renderUser(){const n=S.username||'';document.getElementById('userName').textContent=n||'Minha carteira';document.getElementById('userDot').textContent=(n[0]||'U').toUpperCase()}
 async function logout(){try{await api('/api/logout','POST',{})}catch(e){}location.href='/login'}
-function renderAll(){renderUser();renderDashboard();renderInvestments();renderTransactions();renderGoals();document.getElementById('cdiInput').value=S.cdi}
+function renderAll(){renderUser();renderDashboard();renderInvestments();renderTransactions();renderDividends();renderGoals();document.getElementById('cdiInput').value=S.cdi}
 
 function renderDashboard(){
  const t=S.totals;
@@ -329,6 +344,14 @@ function renderInvestments(){
 function selectInvestment(id){selectedInvestment=id;showInvestmentDetail(id)}
 function showInvestmentDetail(id){const i=S.investments.find(x=>x.id===id);if(!i)return;document.getElementById('investmentDetail').innerHTML=`<div class="section-head" style="margin-top:0"><div><h2>${escapeHTML(i.name)}</h2><p>${escapeHTML(i.type)} · Aplicado em ${dateBR(i.date)} · ${escapeHTML(fmtRate(i))}</p></div><span class="tag">Acompanhamento individual</span></div><div class="calc-grid"><div class="result-box"><small>Saldo bruto estimado hoje</small><strong>${money(i.gross)}</strong><small>Capital de ${money(i.amount)} + rendimento de ${money(i.profit)}</small></div><div class="result-box"><small>Saldo líquido estimado*</small><strong>${money(i.net)}</strong><small>${i.exempt?'Isento de IR e IOF para pessoa física':`IR estimado: ${money(i.ir)} · IOF: ${money(i.iof)}`}</small></div></div><div class="result-list"><div class="result-item"><small>Tempo aplicado</small><b>${i.days} dias corridos</b></div><div class="result-item"><small>Rendimento bruto</small><b class="${i.profit<0?'negative':'positive'}">${money(i.profit)}</b></div><div class="result-item"><small>Taxa anual efetiva usada</small><b>${(i.annual_rate*100).toFixed(2).replace('.',',')}%</b></div><div class="result-item"><small>Vencimento</small><b>${dateBR(i.maturity)}</b></div></div><p class="hint" style="margin-top:13px">*Estimativa simplificada para fins educativos. A regra de IR/IOF depende do produto e das condições da aplicação. CDI de referência configurado: ${Number(S.cdi).toFixed(2).replace('.',',')}% a.a.</p>`}
 
+const monthBR=m=>{const[y,mo]=m.split('-');return ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][+mo-1]+'/'+y};
+function renderDividends(){
+ const d=S.dividends||{received:0,avg_month:0,upcoming:0,by_month:[]};
+ document.getElementById('divReceived').textContent=money(d.received);document.getElementById('divAvg').textContent=money(d.avg_month);document.getElementById('divUpcoming').textContent=money(d.upcoming);
+ const vi=S.investments.filter(i=>i.quantity!=null);
+ document.getElementById('divAssetRows').innerHTML=vi.length?vi.map(i=>{const v=i.dividends;if(!v)return `<tr><td><b>${escapeHTML(i.name)}</b><div class="muted">${escapeHTML(i.type)}</div></td><td>${Number(i.quantity).toLocaleString('pt-BR')}</td><td colspan="3" class="muted">Sem dados de proventos agora</td></tr>`;const nx=v.upcoming[0];return `<tr><td><b>${escapeHTML(i.name)}</b><div class="muted">${escapeHTML(i.type)}</div></td><td>${Number(i.quantity).toLocaleString('pt-BR')}</td><td>${money(v.avg_month)}</td><td class="positive">${money(v.received)}</td><td>${nx?`${money(nx.amount)} em ${dateBR(nx.date)}`:'<span class="muted">Nenhum anunciado</span>'}</td></tr>`}).join(''):'<tr><td colspan="5"><div class="empty"><b>Nenhum ativo de renda variável</b>Adicione ações, FIIs, ETFs ou BDRs em Investimentos.</div></td></tr>';
+ document.getElementById('divMonthRows').innerHTML=d.by_month.length?d.by_month.map(m=>`<tr><td>${monthBR(m.month)}</td><td class="positive">${money(m.amount)}</td></tr>`).join(''):'<tr><td colspan="2"><div class="empty"><b>Nenhum provento recebido ainda</b>Aparecem aqui os pagamentos feitos depois da data da sua compra.</div></td></tr>';
+}
 function renderTransactions(){
  document.getElementById('incomeTotal').textContent=money(S.income);document.getElementById('expenseTotal').textContent=money(S.expense);document.getElementById('transactionBalance').textContent=money(S.income-S.expense);document.getElementById('transactionCount').textContent=S.transactions.length;
  document.getElementById('transactionRows').innerHTML=S.transactions.length?S.transactions.map(t=>`<tr><td><b>${escapeHTML(t.description)}</b></td><td>${escapeHTML(t.category)}</td><td>${dateBR(t.date)}</td><td><span class="tag ${t.kind==='expense'?'red':''}">${t.kind==='income'?'Receita':'Despesa'}</span></td><td class="${t.kind==='income'?'positive':'negative'}">${t.kind==='income'?'+':'−'} ${money(t.amount)}</td><td><div class="actions"><button class="btn small" onclick="openTransactionModal(${t.id})">Editar</button><button class="btn small danger" onclick="deleteTransaction(${t.id})">Excluir</button></div></td></tr>`).join(''):'<tr><td colspan="6" class="empty">Nenhuma movimentação registrada.</td></tr>';

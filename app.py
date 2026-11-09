@@ -222,31 +222,78 @@ def ticker_of(name):
     return m.group(1) if m else None
 
 
-def fetch_quote(ticker):
-    """Consulta o preço atual. Devolve um número ou None."""
-    url = "https://brapi.dev/api/quote/" + urllib.parse.quote(ticker)
+def fetch_market(ticker):
+    """Consulta preço atual e proventos (dividendos, JCP, rendimentos). Devolve um dicionário ou None."""
+    url = "https://brapi.dev/api/quote/" + urllib.parse.quote(ticker) + "?dividends=true"
     token = os.environ.get("BRAPI_TOKEN")
     if token:
-        url += "?token=" + urllib.parse.quote(token)
+        url += "&token=" + urllib.parse.quote(token)
     req = urllib.request.Request(url, headers={"User-Agent": "vital-garanhao"})
     with urllib.request.urlopen(req, timeout=QUOTE_TIMEOUT) as resp:
-        data = json.load(resp)
-    price = data["results"][0]["regularMarketPrice"]
-    price = float(price)
-    return price if price > 0 and not math.isnan(price) and not math.isinf(price) else None
+        result = json.load(resp)["results"][0]
+    price = float(result["regularMarketPrice"])
+    if not (price > 0) or math.isinf(price):
+        return None
+    dividends = []
+    for d in ((result.get("dividendsData") or {}).get("cashDividends") or []):
+        try:
+            pay = str(d["paymentDate"])[:10]
+            date.fromisoformat(pay)
+            rate = float(d["rate"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        com = str(d.get("lastDatePrior") or "")[:10]
+        try:
+            date.fromisoformat(com)
+        except ValueError:
+            com = ""
+        if rate > 0:
+            dividends.append({"pay": pay, "com": com, "rate": rate, "kind": str(d.get("label") or "")})
+    return {"price": price, "dividends": dividends}
 
 
-def get_quote(ticker):
+def get_market(ticker):
     now = time.time()
     hit = _quotes.get(ticker)
     if hit and now < hit[1]:
         return hit[0]
     try:
-        price = fetch_quote(ticker)
+        data = fetch_market(ticker)
     except Exception:  # sem internet, limite da brapi, ativo inexistente...: segue sem cotação
-        price = None
-    _quotes[ticker] = (price, now + (QUOTE_TTL if price else QUOTE_FAIL_TTL))
-    return price
+        data = None
+    _quotes[ticker] = (data, now + (QUOTE_TTL if data else QUOTE_FAIL_TTL))
+    return data
+
+
+def dividends_for(inv, market, today):
+    """Proventos de um ativo: só conta o que foi pago a quem já tinha o ativo na data com (ou na compra)."""
+    qty = float(inv["quantity"])
+    start = inv["date"]
+    year_ago = (today - timedelta(days=365)).isoformat()
+    months, upcoming, received, last12 = {}, [], 0.0, 0.0
+    for d in market["dividends"]:
+        if d["pay"] > today.isoformat():
+            if (d["com"] or d["pay"]) >= start:
+                upcoming.append({"date": d["pay"], "amount": round(d["rate"] * qty, 2)})
+            continue
+        if d["pay"] >= year_ago:
+            last12 += d["rate"]
+        if (d["com"] or d["pay"]) < start:
+            continue
+        value = d["rate"] * qty
+        received += value
+        months[d["pay"][:7]] = months.get(d["pay"][:7], 0.0) + value
+    return {
+        "received": round(received, 2),
+        "avg_month": round(last12 * qty / 12, 2),
+        "months": [{"month": k, "amount": round(v, 2)} for k, v in sorted(months.items())],
+        "upcoming": sorted(upcoming, key=lambda u: u["date"]),
+    }
+
+
+def get_quote(ticker):
+    market = get_market(ticker)
+    return market["price"] if market else None
 
 
 def quoted_metrics(inv, price, as_of):
@@ -555,13 +602,15 @@ def api_summary():
     inv_rows = db.execute("SELECT * FROM investments WHERE user_id = ? ORDER BY id", (uid,)).fetchall()
     for row in inv_rows:
         m = metrics(row, cdi, today)
-        price = None
+        price = dividends = None
         if row["type"] in VARIABLE_TYPES and row["quantity"]:
             tk = ticker_of(row["name"])
-            price = get_quote(tk) if tk else None
-            if price:
+            market = get_market(tk) if tk else None
+            if market:
+                price = market["price"]
                 m = quoted_metrics(row, price, today)
                 live[row["id"]] = m["gross"]
+                dividends = dividends_for(row, market, today)
         invested += row["amount"]
         yielded += m["profit"]
         groups[row["type"]] = groups.get(row["type"], 0.0) + row["amount"]
@@ -569,11 +618,22 @@ def api_summary():
             "id": row["id"], "name": row["name"], "type": row["type"],
             "amount": row["amount"], "date": row["date"], "index": row["indexer"],
             "rate": row["rate"], "maturity": row["maturity"], "institution": row["institution"],
-            "quantity": row["quantity"], "unit_price": row["unit_price"], "price": price,
+            "quantity": row["quantity"], "unit_price": row["unit_price"], "price": price, "dividends": dividends,
             "gross": round(m["gross"], 2), "profit": round(m["profit"], 2),
             "iof": round(m["iof"], 2), "ir": round(m["ir"], 2), "net": round(m["net"], 2),
             "days": m["days"], "annual_rate": round(m["annual_rate"], 6), "exempt": m["exempt"],
         })
+
+    by_month = {}
+    for i in investments:
+        for mth in (i["dividends"] or {}).get("months", []):
+            by_month[mth["month"]] = by_month.get(mth["month"], 0.0) + mth["amount"]
+    dividends_summary = {
+        "received": round(sum(by_month.values()), 2),
+        "avg_month": round(sum((i["dividends"] or {}).get("avg_month", 0.0) for i in investments), 2),
+        "upcoming": round(sum(u["amount"] for i in investments for u in (i["dividends"] or {}).get("upcoming", [])), 2),
+        "by_month": [{"month": k, "amount": round(v, 2)} for k, v in sorted(by_month.items(), reverse=True)],
+    }
 
     total = sum(groups.values())
     distribution = [
@@ -613,7 +673,7 @@ def api_summary():
         investments=investments, distribution=distribution,
         evolution=evolution(inv_rows, cdi, today, today_value=live),
         transactions=transactions, income=round(income, 2), expense=round(expense, 2),
-        goals=goals,
+        goals=goals, dividends=dividends_summary,
     )
 
 

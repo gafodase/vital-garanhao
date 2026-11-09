@@ -14,6 +14,7 @@ Não coloque dados financeiros reais: é uma versão de demonstração.
 - **Painel** com patrimônio total, rendimento estimado, gráfico de evolução mês a mês e distribuição da carteira.
 - **Renda fixa** (CDB, LCI, LCA, Tesouro, Poupança): rendimento por CDI, IPCA+ ou taxa fixa, com **IR e IOF** calculados.
 - **Renda variável** (ações, FIIs, ETFs e BDRs): lista completa da B3 para escolher o ativo, com quantidade, preço pago e **cotação atual, lucro e prejuízo**.
+- **Proventos** (dividendos, JCP e rendimentos): média mensal e total recebido de cada ativo, mês a mês, e o que ainda vai cair.
 - **Receitas e despesas** por categoria, com o saldo do mês.
 - **Metas financeiras** que acompanham o total da carteira sozinhas, se você quiser.
 - **Simulador** de juros compostos.
@@ -26,6 +27,7 @@ Não coloque dados financeiros reais: é uma versão de demonstração.
 
 | Versão | O que mudou |
 |--------|-------------|
+| **v1.6** | Aba **Proventos**: quanto cada ativo paga por mês e quanto você já recebeu |
 | **v1.5** | Cotações ao vivo (brapi.dev) com lucro e prejuízo em ações, FIIs, ETFs e BDRs |
 | **v1.4** | Renda variável pede quantidade e preço pago; some taxa, indexador e vencimento |
 | **v1.3** | Lista da B3 (ações, FIIs, ETFs e BDRs) para escolher o ativo |
@@ -69,6 +71,7 @@ Em outros servidores é preciso: HTTPS com `HTTPS=1`, um servidor de produção 
 
 - **LCI, LCA e Poupança:** isentos de IR e IOF (pessoa física).
 - **Demais investimentos de renda fixa:** IR pela tabela regressiva (22,5% até 180 dias, 20% até 360, 17,5% até 720, 15% acima) e IOF pela tabela oficial nos primeiros 29 dias.
+- **Proventos:** vêm da brapi.dev e só contam o que foi pago a quem já tinha o ativo na data com. Média mensal = soma dos últimos 12 meses ÷ 12. Podem divergir do que a corretora creditou.
 - **Renda variável:** valor atual = quantidade × cotação (guardada por 15 minutos). Sem IR/IOF nessa conta. Se a cotação não vier, o ativo fica pelo valor pago.
 - A brapi libera poucos ativos sem cadastro; para a carteira toda, crie um token grátis em https://brapi.dev e defina `BRAPI_TOKEN`.
 - A lista da B3 (`b3_ativos.json`, cadastro de 05/11/2026) é fixa: ativos novos só entram quando o arquivo for atualizado.
