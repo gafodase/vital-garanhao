@@ -1,15 +1,26 @@
 # VITAL GARANHAO
 
-Controle financeiro com **Flask (Python) + SQLite**, com **login e cadastro de usuários**.
-O Python guarda os dados e faz os cálculos (rendimento, IR, IOF, simulador); o HTML cuida só da tela.
-Cada pessoa vê apenas os próprios investimentos, movimentações e metas.
+Aplicativo web de **controle financeiro pessoal**: investimentos, receitas e despesas, metas e simulador, com **login e cadastro** e dados separados por usuário.
 
-## Acessar o site
-
-**https://ganaves.pythonanywhere.com**
+**Site no ar:** https://ganaves.pythonanywhere.com
 
 Abra o link, clique em **Criar conta** e use. Não precisa instalar nada.
-Use sempre `https://`. Não coloque dados financeiros reais: é uma versão de demonstração.
+Não coloque dados financeiros reais: é uma versão de demonstração.
+
+![Painel com patrimônio, gráfico de evolução e distribuição da carteira](docs/painel.png)
+
+## O que o app faz
+
+- **Painel** com patrimônio total, rendimento estimado, gráfico de evolução mês a mês e distribuição da carteira.
+- **Renda fixa** (CDB, LCI, LCA, Tesouro, Poupança): rendimento por CDI, IPCA+ ou taxa fixa, com **IR e IOF** calculados.
+- **Renda variável** (ações, FIIs, ETFs e BDRs): lista completa da B3 para escolher o ativo, com quantidade, preço pago e **cotação atual, lucro e prejuízo**.
+- **Receitas e despesas** por categoria, com o saldo do mês.
+- **Metas financeiras** que acompanham o total da carteira sozinhas, se você quiser.
+- **Simulador** de juros compostos.
+- **Editar e excluir** qualquer registro.
+- Funciona bem no **celular**.
+
+<img src="docs/cadastro-fii.png" alt="Cadastro de um FII escolhendo o ativo na lista da B3" width="320">
 
 ## Versões
 
@@ -22,11 +33,18 @@ Use sempre `https://`. Não coloque dados financeiros reais: é uma versão de d
 | **v1.1** | Publicação online (PythonAnywhere) e conta de demonstração |
 | **v1.0** | Primeira versão: Flask + SQLite, login, metas automáticas, edição, impostos e gráfico |
 
-Detalhes de cada versão no [CHANGELOG](CHANGELOG.md).
+Detalhes de cada versão no [CHANGELOG](CHANGELOG.md). Ainda não feito: recuperação de senha.
+
+## Tecnologias
+
+- **Python 3 + Flask**: servidor, login, API e todos os cálculos (rendimento, IR, IOF, simulador).
+- **SQLite**: banco de dados em um único arquivo.
+- **HTML, CSS e JavaScript** puros: só cuidam da tela (inclui o gráfico, desenhado em canvas).
+- **PythonAnywhere**: hospedagem. O GitHub guarda o código.
 
 ## Como rodar no seu computador (opcional)
 
-Só precisa disto se quiser mexer no código. Para apenas usar o site, use o link acima.
+Só precisa disto se quiser mexer no código. Para apenas usar o site, use o link do topo.
 Antes, instale o Python (https://www.python.org) e abra o terminal dentro da pasta do projeto.
 
 ```bash
@@ -40,40 +58,50 @@ python app.py
 
 Abra http://localhost:5000. Na primeira vez, clique em **Criar conta**.
 
-> Dados de uma versão antiga (sem login) ficam para a **primeira conta criada**.
+Para ver o app já cheio de dados de exemplo: `python seed_demo.py USUARIO SENHA` cria uma conta de demonstração.
 
-## Lista de ações, FIIs, ETFs e BDRs
+## Colocar no ar
 
-Ao adicionar um investimento e escolher o tipo **Ações, FIIs, ETF ou BDR**, aparece o campo
-**Escolher ... da B3**: ao tocar nele a lista completa daquele tipo se abre (rolável) e dá para
-filtrar digitando código ou nome (ex.: PETR4, HGLG11, BOVA11, AAPL34). Escolher já preenche o nome.
-Para esses tipos o formulário pede **quantidade comprada** e **preço pago por unidade** (o valor investido é a multiplicação dos dois) e esconde taxa, indexador e vencimento.
-Com o ativo escolhido na lista, o site busca a **cotação atual na brapi.dev** (guarda por 15 minutos) e mostra o valor de hoje e o lucro ou prejuízo.
-Se a cotação não vier (sem internet, limite do serviço, nome digitado à mão), o ativo fica pelo valor pago. Sem IR/IOF nessa conta.
-A brapi libera poucos ativos sem cadastro; para a carteira toda, crie um token grátis em https://brapi.dev e defina `BRAPI_TOKEN`.
-A lista (cerca de 2.700 ativos) vem do Cadastro de Instrumentos da B3 de 05/11/2026 e fica em
-`b3_ativos.json`. É uma lista fixa: ativos novos ou que mudaram de código só entram quando o arquivo for atualizado.
+O passo a passo (GitHub + PythonAnywhere, com um script que faz o trabalho pesado) está no **[DEPLOY.md](DEPLOY.md)**.
+Em outros servidores é preciso: HTTPS com `HTTPS=1`, um servidor de produção (por exemplo `gunicorn app:app`), uma `SECRET_KEY` própria e backup do `vital.db`.
+
+## Regras usadas nos cálculos
+
+- **LCI, LCA e Poupança:** isentos de IR e IOF (pessoa física).
+- **Demais investimentos de renda fixa:** IR pela tabela regressiva (22,5% até 180 dias, 20% até 360, 17,5% até 720, 15% acima) e IOF pela tabela oficial nos primeiros 29 dias.
+- **Renda variável:** valor atual = quantidade × cotação (guardada por 15 minutos). Sem IR/IOF nessa conta. Se a cotação não vier, o ativo fica pelo valor pago.
+- A brapi libera poucos ativos sem cadastro; para a carteira toda, crie um token grátis em https://brapi.dev e defina `BRAPI_TOKEN`.
+- A lista da B3 (`b3_ativos.json`, cadastro de 05/11/2026) é fixa: ativos novos só entram quando o arquivo for atualizado.
+
+## Segurança
+
+- Senhas guardadas com hash (nunca o texto da senha).
+- Cookie de sessão protegido (HttpOnly, SameSite) e válido por 7 dias.
+- Bloqueio temporário após 5 senhas erradas em 5 minutos.
+- Cada consulta é filtrada pelo usuário logado, então ninguém acessa dados de outra conta.
+- `vital.db` e `secret.key` ficam só no servidor e nunca vão para o GitHub.
 
 ## Estrutura
 
 ```
 vital-garanhao/
-├── app.py                # servidor Flask, login, API, cálculos e banco SQLite
+├── app.py                    # servidor Flask, login, API, cálculos e banco SQLite
+├── b3_ativos.json            # lista fixa de ações, FIIs, ETFs e BDRs da B3
 ├── requirements.txt
-├── DEPLOY.md             # passo a passo para publicar (GitHub + PythonAnywhere)
+├── CHANGELOG.md              # histórico de versões
+├── DEPLOY.md                 # passo a passo para publicar
 ├── setup_pythonanywhere.sh   # instala e configura o site no PythonAnywhere
-├── b3_ativos.json        # lista fixa de ações, FIIs, ETFs e BDRs da B3 (posição de 05/11/2026)
-├── seed_demo.py          # cria uma conta de demonstração com dados de exemplo
+├── seed_demo.py              # cria uma conta de demonstração
+├── docs/                     # imagens do README
 ├── templates/
-│   ├── index.html        # painel (exige login)
-│   └── login.html        # entrar / criar conta
-├── vital.db              # banco de dados (criado na primeira execução)
-└── secret.key            # chave que assina o login (criada na primeira execução)
+│   ├── index.html            # painel (exige login)
+│   └── login.html            # entrar / criar conta
+├── vital.db                  # banco de dados (criado na primeira execução)
+└── secret.key                # chave que assina o login (criada na primeira execução)
 ```
 
-Não compartilhe `vital.db` nem `secret.key`.
-
-## Rotas da API
+<details>
+<summary><b>Rotas da API</b></summary>
 
 | Método | Rota | O que faz |
 |--------|------|-----------|
@@ -81,6 +109,7 @@ Não compartilhe `vital.db` nem `secret.key`.
 | POST | `/api/login` | Entra |
 | POST | `/api/logout` | Sai |
 | GET | `/api/summary` | Tudo já calculado do usuário logado |
+| GET | `/api/assets` | Lista de ações, FIIs, ETFs e BDRs da B3 |
 | POST | `/api/investments` | Cadastra investimento |
 | PUT | `/api/investments/<id>` | Edita investimento |
 | DELETE | `/api/investments/<id>` | Exclui investimento |
@@ -91,36 +120,11 @@ Não compartilhe `vital.db` nem `secret.key`.
 | PUT | `/api/goals/<id>` | Edita meta |
 | PATCH | `/api/goals/<id>` | Liga/desliga o acompanhamento automático da meta |
 | DELETE | `/api/goals/<id>` | Exclui meta |
-| GET | `/api/assets` | Lista de ações, FIIs, ETFs e BDRs da B3 (para o cadastro) |
 | PUT | `/api/settings` | Altera o CDI de referência |
 | POST | `/api/simulate` | Simulador de juros compostos |
 
 Todas, exceto cadastro e login, exigem estar logado.
 
-## Segurança (o que já está feito)
+</details>
 
-- Senhas guardadas com hash (nunca o texto da senha).
-- Cookie de sessão protegido (HttpOnly, SameSite) e válido por 7 dias.
-- Bloqueio temporário após 5 senhas erradas em 5 minutos.
-- Cada consulta é filtrada pelo usuário logado, então ninguém acessa dados de outra conta.
-
-## Para outras pessoas usarem pela internet
-
-Rodando em `localhost`, só quem está neste computador acessa. Para deixar o site no ar sem o
-seu computador (GitHub + PythonAnywhere), siga o passo a passo do arquivo **DEPLOY.md**.
-Em outros servidores, é preciso:
-
-- use **HTTPS** e defina `HTTPS=1` para o cookie só viajar protegido;
-- rode com um servidor de produção (por exemplo `gunicorn app:app`), nunca com `python app.py`;
-- defina uma `SECRET_KEY` própria e faça backup do `vital.db`.
-
-Para zerar tudo, pare o servidor e apague `vital.db`.
-
-## Regras de imposto usadas
-
-- **LCI, LCA e Poupança:** isentos de IR e IOF (pessoa física).
-- **Demais investimentos:** IR pela tabela regressiva (22,5% até 180 dias, 20% até 360, 17,5% até 720, 15% acima) e IOF pela tabela oficial nos primeiros 29 dias.
-- Ações, FIIs e ETF têm regras próprias na vida real; aqui seguem a mesma tabela, como simplificação.
-
-> Versão demonstrativa. Cálculos de IR/IOF são estimativas simplificadas e não constituem
-> recomendação de investimento.
+> Versão demonstrativa. Os cálculos de IR e IOF são estimativas simplificadas e não são recomendação de investimento.
