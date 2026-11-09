@@ -6,6 +6,7 @@ Tudo o que mudou no projeto, da primeira versão até agora. A mais recente vem 
 - Nova aba **Proventos**: média por mês, total já recebido e valor a receber de cada ação, FII, ETF e BDR.
 - Tabela mês a mês com tudo o que já caiu, contando só o que foi pago depois da sua compra.
 - Dados da brapi.dev; se não vierem, a aba avisa em vez de mostrar números errados.
+- Quando não vêm dados, a aba mostra o motivo (ex.: ativo que exige o token da brapi, ou nome sem o código do ativo).
 
 ## v1.5: Cotações ao vivo (08/11/2026)
 - Ações, FIIs, ETFs e BDRs mostram o **preço de hoje** (brapi.dev) e o **lucro ou prejuízo**, em vermelho quando perde.

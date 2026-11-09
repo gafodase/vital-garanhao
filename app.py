@@ -12,6 +12,7 @@ import re
 import secrets
 import sqlite3
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import date, timedelta
@@ -214,6 +215,7 @@ QUOTE_TTL = 900         # reaproveita a cotação por 15 minutos
 QUOTE_FAIL_TTL = 300    # se a consulta falhar, não tenta de novo por 5 minutos
 QUOTE_TIMEOUT = 3       # segundos por consulta, para o site nunca travar
 _quotes = {}
+_quote_errors = {}
 TICKER_RE = re.compile(r"^([A-Z0-9]{4}\d{1,2})\b")
 
 
@@ -259,8 +261,17 @@ def get_market(ticker):
         return hit[0]
     try:
         data = fetch_market(ticker)
-    except Exception:  # sem internet, limite da brapi, ativo inexistente...: segue sem cotação
+        _quote_errors.pop(ticker, None)
+    except urllib.error.HTTPError as err:  # a brapi respondeu com erro: guarda o motivo para mostrar na tela
         data = None
+        try:
+            detail = json.load(err).get("message", "")
+        except Exception:
+            detail = ""
+        _quote_errors[ticker] = f"brapi respondeu erro {err.code}" + (f": {detail}" if detail else "")
+    except Exception:  # sem internet, tempo esgotado...: segue sem cotação
+        data = None
+        _quote_errors[ticker] = "não foi possível falar com a brapi agora"
     _quotes[ticker] = (data, now + (QUOTE_TTL if data else QUOTE_FAIL_TTL))
     return data
 
@@ -602,10 +613,14 @@ def api_summary():
     inv_rows = db.execute("SELECT * FROM investments WHERE user_id = ? ORDER BY id", (uid,)).fetchall()
     for row in inv_rows:
         m = metrics(row, cdi, today)
-        price = dividends = None
+        price = dividends = market_error = None
         if row["type"] in VARIABLE_TYPES and row["quantity"]:
             tk = ticker_of(row["name"])
             market = get_market(tk) if tk else None
+            if not tk:
+                market_error = "o nome não começa com o código do ativo (ex.: MXRF11 · ...)"
+            elif not market:
+                market_error = _quote_errors.get(tk) or "sem cotação"
             if market:
                 price = market["price"]
                 m = quoted_metrics(row, price, today)
@@ -618,7 +633,7 @@ def api_summary():
             "id": row["id"], "name": row["name"], "type": row["type"],
             "amount": row["amount"], "date": row["date"], "index": row["indexer"],
             "rate": row["rate"], "maturity": row["maturity"], "institution": row["institution"],
-            "quantity": row["quantity"], "unit_price": row["unit_price"], "price": price, "dividends": dividends,
+            "quantity": row["quantity"], "unit_price": row["unit_price"], "price": price, "dividends": dividends, "market_error": market_error,
             "gross": round(m["gross"], 2), "profit": round(m["profit"], 2),
             "iof": round(m["iof"], 2), "ir": round(m["ir"], 2), "net": round(m["net"], 2),
             "days": m["days"], "annual_rate": round(m["annual_rate"], 6), "exempt": m["exempt"],
